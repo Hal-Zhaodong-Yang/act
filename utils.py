@@ -139,13 +139,19 @@ def sample_box_pose():
     cube_position = np.random.uniform(ranges[:, 0], ranges[:, 1])
 
     cube_quat = np.array([1, 0, 0, 0])
-    return np.concatenate([cube_position, cube_quat])
+
+    pos_noise1 = (np.random.rand(3) * 2 - 1) / 200
+    quat_noise1 = (np.random.rand(4) * 2 - 1) / 500
+    return np.concatenate([cube_position + pos_noise1, cube_quat + quat_noise1])
 
 def sample_insertion_pose():
     # Peg
     x_range = [0.1, 0.2]
     y_range = [0.4, 0.6]
     z_range = [0.05, 0.05]
+    # x_range = [0.15, 0.15]
+    # y_range = [0.5, 0.5]
+    # z_range = [0.05, 0.05]
 
     ranges = np.vstack([x_range, y_range, z_range])
     peg_position = np.random.uniform(ranges[:, 0], ranges[:, 1])
@@ -154,8 +160,11 @@ def sample_insertion_pose():
     peg_pose = np.concatenate([peg_position, peg_quat])
 
     # Socket
-    x_range = [-0.2, -0.1]
-    y_range = [0.4, 0.6]
+    # x_range = [-0.2, -0.1]
+    # y_range = [0.4, 0.6]
+    # z_range = [0.05, 0.05]
+    x_range = [-0.15, -0.15]
+    y_range = [0.5, 0.5]
     z_range = [0.05, 0.05]
 
     ranges = np.vstack([x_range, y_range, z_range])

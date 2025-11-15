@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from tqdm import tqdm
 from einops import rearrange
+import h5py
 
 from constants import DT
 from constants import PUPPET_GRIPPER_JOINT_OPEN
@@ -32,6 +33,7 @@ def main(args):
     batch_size_train = args['batch_size']
     batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
+    demo_start_idx = args['demo_start_idx']
 
     # get task parameters
     is_sim = task_name[:4] == 'sim_'
@@ -85,7 +87,8 @@ def main(args):
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': not is_sim
+        'real_robot': not is_sim,
+        'demo_start_idx': demo_start_idx
     }
 
     if is_eval:
@@ -160,6 +163,7 @@ def eval_bc(config, ckpt_name, save_episode=True):
     max_timesteps = config['episode_len']
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
+    demo_start_idx = config['demo_start_idx']
     onscreen_cam = 'angle'
 
     # load policy and stats
@@ -195,11 +199,15 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
     max_timesteps = int(max_timesteps * 1) # may increase for real-world tasks
 
-    num_rollouts = 50
+    num_rollouts = 200
     episode_returns = []
     highest_rewards = []
+    demo_count = demo_start_idx
+    print(f"{num_rollouts} rollouts in total")
     for rollout_id in range(num_rollouts):
         rollout_id += 0
+        if rollout_id == 50:
+            save_episode = False
         ### set task
         if 'sim_transfer_cube' in task_name:
             BOX_POSE[0] = sample_box_pose() # used in sim reset
@@ -220,10 +228,20 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         image_list = [] # for visualization
+        image_record_list = [] # for collecting demo
+        gripper_pose_list = []
         qpos_list = []
+        qvel_list = []
+        env_state_list = []
         target_qpos_list = []
         rewards = []
+        # print("ts:")
+        # print(ts.observation['qpos'])
+        # print(ts.observation['qvel'])
+        # print(ts.observation['env_state'])
+        
         with torch.inference_mode():
+            
             for t in range(max_timesteps):
                 ### update onscreen render and wait for DT
                 if onscreen_render:
@@ -233,11 +251,16 @@ def eval_bc(config, ckpt_name, save_episode=True):
 
                 ### process previous timestep to get qpos and image_list
                 obs = ts.observation
+                image_record_list.append(obs['images']['top'])
                 if 'images' in obs:
                     image_list.append(obs['images'])
                 else:
                     image_list.append({'main': obs['image']})
+                gripper_pose_numpy = np.array(obs['gripper_pose'])
                 qpos_numpy = np.array(obs['qpos'])
+                qvel_numpy = np.array(obs['qvel'])
+                env_state_numpy = np.array(obs['env_state'])
+
                 qpos = pre_process(qpos_numpy)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
@@ -275,6 +298,9 @@ def eval_bc(config, ckpt_name, save_episode=True):
                 ### for visualization
                 qpos_list.append(qpos_numpy)
                 target_qpos_list.append(target_qpos)
+                qvel_list.append(qvel_numpy)
+                env_state_list.append(env_state_numpy)
+                gripper_pose_list.append(gripper_pose_numpy)
                 rewards.append(ts.reward)
 
             plt.close()
@@ -288,6 +314,40 @@ def eval_bc(config, ckpt_name, save_episode=True):
         episode_highest_reward = np.max(rewards)
         highest_rewards.append(episode_highest_reward)
         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
+        if episode_highest_reward==env_max_reward and env_state_list[-1][2] >= 0.1:
+            qpos_list = np.array(qpos_list)
+            target_qpos_list = np.array(target_qpos_list)
+            qvel_list = np.array(qvel_list)
+            env_state_list = np.array(env_state_list)
+            gripper_pose_list = np.array(gripper_pose_list)
+            # previous one
+            # with h5py.File(os.path.join(ckpt_dir, f'demo_{demo_count}.hdf5'), 'w') as root:
+            with h5py.File(os.path.join(ckpt_dir, f'episode_{demo_count}.hdf5'), 'w') as root:
+                # previous one
+                # observation_group = root.create_group('observation')
+                observation_group = root.create_group('observations')
+                qpos_set = observation_group.create_dataset('qpos', (qpos_list.shape[0], qpos_list.shape[1]))
+                qvel_set = observation_group.create_dataset('qvel', (qvel_list.shape[0], qvel_list.shape[1]))
+                env_state_set = observation_group.create_dataset('env_state', (env_state_list.shape[0], env_state_list.shape[1]))
+                gripper_pose_set = observation_group.create_dataset('gripper_pose', (gripper_pose_list.shape[0], gripper_pose_list.shape[1]))
+                action_set = root.create_dataset('action', (target_qpos_list.shape[0],target_qpos_list.shape[1]))
+                qpos_set[...] = qpos_list
+                qvel_set[...] = qvel_list
+                env_state_set[...] = env_state_list
+                gripper_pose_set[...] = gripper_pose_list
+                action_set[...] = target_qpos_list
+
+                # added for train on ACT
+                root.attrs['sim'] = True
+                image_set = observation_group.create_group('images')
+                top_view = image_set.create_dataset('top', (len(image_record_list), 480, 640, 3), dtype='uint8',
+                                         chunks=(1, 480, 640, 3), )
+                top_view[...] = image_record_list
+            
+            save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'demo_{demo_count}.mp4'))
+            print(f'save rollout to demo_{demo_count}.hdf5')
+            demo_count += 1
+
 
         if save_episode:
             save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
@@ -431,5 +491,6 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dim', action='store', type=int, help='hidden_dim', required=False)
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
+    parser.add_argument('--demo_start_idx', action='store', type=int, help='start index of demo', required=True)
     
     main(vars(parser.parse_args()))

@@ -27,6 +27,7 @@ def main(args):
     dataset_dir = args['dataset_dir']
     num_episodes = args['num_episodes']
     onscreen_render = args['onscreen_render']
+    koopman_demo = args['koopman_demo']
     inject_noise = False
     render_cam_name = 'angle'
 
@@ -110,7 +111,13 @@ def main(args):
 
         episode_return = np.sum([ts.reward for ts in episode_replay[1:]])
         episode_max_reward = np.max([ts.reward for ts in episode_replay[1:]])
-        if episode_max_reward == env.task.max_reward:
+        if "transfer_cube" in task_name:
+            is_success = (episode_replay[-1].reward == env.task.max_reward)
+        elif "insertion" in task_name:
+            is_success = (episode_max_reward==env.task.max_reward)
+        else:
+            raise NotImplementedError
+        if is_success:
             success.append(1)
             print(f"{episode_idx=} Successful, {episode_return=}")
         else:
@@ -130,13 +137,22 @@ def main(args):
         action                  (14,)         'float64'
         """
 
-        data_dict = {
-            '/observations/qpos': [],
-            '/observations/qvel': [],
-            '/action': [],
-        }
-        for cam_name in camera_names:
-            data_dict[f'/observations/images/{cam_name}'] = []
+        if koopman_demo:
+            data_dict = {
+                '/observation/qpos': [],
+                '/observation/qvel': [],
+                '/observation/env_state': [],
+                '/observation/gripper_pose': [],
+                '/action': [],
+            }
+        else:
+            data_dict = {
+                '/observations/qpos': [],
+                '/observations/qvel': [],
+                '/action': [],
+            }
+            for cam_name in camera_names:
+                data_dict[f'/observations/images/{cam_name}'] = []
 
         # because the replaying, there will be eps_len + 1 actions and eps_len + 2 timesteps
         # truncate here to be consistent
@@ -149,22 +165,38 @@ def main(args):
         while joint_traj:
             action = joint_traj.pop(0)
             ts = episode_replay.pop(0)
-            data_dict['/observations/qpos'].append(ts.observation['qpos'])
-            data_dict['/observations/qvel'].append(ts.observation['qvel'])
             data_dict['/action'].append(action)
-            for cam_name in camera_names:
-                data_dict[f'/observations/images/{cam_name}'].append(ts.observation['images'][cam_name])
+            if koopman_demo:
+                data_dict['/observation/qpos'].append(ts.observation['qpos'])
+                data_dict['/observation/qvel'].append(ts.observation['qvel'])
+                data_dict['/observation/env_state'].append(ts.observation['env_state'])
+                data_dict['/observation/gripper_pose'].append(ts.observation['gripper_pose'])
+                # print("qpos: ", len(ts.observation['qpos']), " qvel: ", len(ts.observation['qvel']), " env_state: ", len(ts.observation['env_state']),
+                #        " gripper_pose: ", len(ts.observation['gripper_pose']))
+            else:
+                data_dict['/observations/qpos'].append(ts.observation['qpos'])
+                data_dict['/observations/qvel'].append(ts.observation['qvel'])
+                for cam_name in camera_names:
+                    data_dict[f'/observations/images/{cam_name}'].append(ts.observation['images'][cam_name])
 
         # HDF5
         t0 = time.time()
-        dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}')
+        if koopman_demo and success[-1]:
+            dataset_path = os.path.join(dataset_dir, f'demo_{np.sum(success) - 1}')
+        else:
+            dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}')
         with h5py.File(dataset_path + '.hdf5', 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
             root.attrs['sim'] = True
-            obs = root.create_group('observations')
-            image = obs.create_group('images')
-            for cam_name in camera_names:
-                _ = image.create_dataset(cam_name, (max_timesteps, 480, 640, 3), dtype='uint8',
-                                         chunks=(1, 480, 640, 3), )
+            if koopman_demo:
+                obs = root.create_group('observation')
+                env_state_set = obs.create_dataset('env_state', (max_timesteps, 7))
+                gripper_pose_set = obs.create_dataset('gripper_pose', (max_timesteps, 24))
+            else:
+                obs = root.create_group('observations')
+                image = obs.create_group('images')
+                for cam_name in camera_names:
+                    _ = image.create_dataset(cam_name, (max_timesteps, 480, 640, 3), dtype='uint8',
+                                            chunks=(1, 480, 640, 3), )
             # compression='gzip',compression_opts=2,)
             # compression=32001, compression_opts=(0, 0, 0, 0, 9, 1, 1), shuffle=False)
             qpos = obs.create_dataset('qpos', (max_timesteps, 14))
@@ -184,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_dir', action='store', type=str, help='dataset saving dir', required=True)
     parser.add_argument('--num_episodes', action='store', type=int, help='num_episodes', required=False)
     parser.add_argument('--onscreen_render', action='store_true')
+    parser.add_argument('--koopman_demo', action='store_true', default = False)
     
     main(vars(parser.parse_args()))
 

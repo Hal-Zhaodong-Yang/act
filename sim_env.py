@@ -100,6 +100,15 @@ class BimanualViperXTask(base.Task):
     @staticmethod
     def get_env_state(physics):
         raise NotImplementedError
+    
+    @staticmethod
+    def get_gripper_pose(physics):
+        left_site_pos = physics.named.data.site_xpos['cali_left_site1']
+        left_site_mat = physics.named.data.site_xmat['cali_left_site1']
+        right_site_pos = physics.named.data.site_xpos['cali_right_site1']
+        right_site_mat = physics.named.data.site_xmat['cali_right_site1']
+
+        return np.concatenate([left_site_pos, left_site_mat, right_site_pos, right_site_mat])
 
     def get_observation(self, physics):
         obs = collections.OrderedDict()
@@ -110,6 +119,8 @@ class BimanualViperXTask(base.Task):
         obs['images']['top'] = physics.render(height=480, width=640, camera_id='top')
         obs['images']['angle'] = physics.render(height=480, width=640, camera_id='angle')
         obs['images']['vis'] = physics.render(height=480, width=640, camera_id='front_close')
+        # add position and rotation of gripper base
+        obs['gripper_pose'] = self.get_gripper_pose(physics)
 
         return obs
 
@@ -127,6 +138,13 @@ class TransferCubeTask(BimanualViperXTask):
         """Sets the state of the environment at the start of each episode."""
         # TODO Notice: this function does not randomize the env configuration. Instead, set BOX_POSE from outside
         # reset qpos, control and box position
+        gripper_noise1 = (np.random.rand(1) * 2 - 1) / 2000
+        gripper_noise2 = (np.random.rand(1) * 2 - 1) / 2000
+        START_ARM_POSE[6] += float(gripper_noise1)
+        START_ARM_POSE[7] -= float(gripper_noise1)
+        START_ARM_POSE[14] += float(gripper_noise2)
+        START_ARM_POSE[15] -= float(gripper_noise2)
+        print("start gripper angle: ", START_ARM_POSE[6:8], START_ARM_POSE[14:16])
         with physics.reset_context():
             physics.named.data.qpos[:16] = START_ARM_POSE
             np.copyto(physics.data.ctrl, START_ARM_POSE)
