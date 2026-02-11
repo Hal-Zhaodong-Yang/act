@@ -39,6 +39,50 @@ class ACTPolicy(nn.Module):
 
     def configure_optimizers(self):
         return self.optimizer
+    
+
+class ACTFlow(nn.Module):
+    def __init__(self, args_override):
+        super().__init__()
+        model, optimizer = build_ACT_model_and_optimizer(args_override)
+        self.model = model # CVAE decoder
+        self.optimizer = optimizer
+        self.kl_weight = args_override['kl_weight']
+        self.object_obs = args_override['object_obs']
+        print(f'KL Weight {self.kl_weight}')
+        print(f"created {self.object_obs} based model")
+
+    def __call__(self, qpos, image, flow, actions=None, is_pad=None):
+        env_state = None
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        if self.object_obs == 'image':
+            image = normalize(image)
+        if actions is not None: # training time
+            actions = actions[:, :self.model.num_queries]
+            is_pad = is_pad[:, :self.model.num_queries]
+
+            if self.object_obs == 'image':
+                a_hat, is_pad_hat, (mu, logvar) = self.model(qpos, env_state, image, None, actions, is_pad)
+            elif self.object_obs == 'flow' or self.object_obs == 'dynamo':
+                a_hat, is_pad_hat, (mu, logvar) = self.model(qpos, env_state, None, flow, actions, is_pad)
+            total_kld, dim_wise_kld, mean_kld = kl_divergence(mu, logvar)
+            loss_dict = dict()
+            all_l1 = F.l1_loss(actions, a_hat, reduction='none')
+            l1 = (all_l1 * ~is_pad.unsqueeze(-1)).mean()
+            loss_dict['l1'] = l1
+            loss_dict['kl'] = total_kld[0]
+            loss_dict['loss'] = loss_dict['l1'] + loss_dict['kl'] * self.kl_weight
+            return loss_dict
+        else: # inference time
+            if self.object_obs == 'image':
+                a_hat, _, (_, _) = self.model(qpos, env_state, image, None) # no action, sample from prior
+            elif self.object_obs == 'flow' or self.object_obs == 'dynamo':
+                a_hat, _, (_, _) = self.model(qpos, env_state, None, flow) # no action, sample from prior
+            return a_hat
+
+    def configure_optimizers(self):
+        return self.optimizer
 
 
 class CNNMLPPolicy(nn.Module):

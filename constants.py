@@ -32,6 +32,87 @@ SIM_TASK_CONFIGS = {
     },
 }
 
+DEXART_TASK_CONFIGS = {
+    'dexart_toilet':{
+        'dataset_dir': DATA_DIR + '/toilet/hdf5',
+        'num_episodes': 30,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 28,
+    },
+    'dexart_bucket':{
+        'dataset_dir': DATA_DIR + '/bucket/hdf5',
+        'num_episodes': 30,
+        'episode_len': 200, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 28,
+    },
+    'dexart_laptop':{
+        'dataset_dir': DATA_DIR + '/laptop/hdf5',
+        'num_episodes': 30,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 28,
+    },
+}
+
+DAPG_TASK_CONFIGS = {
+    'dapg_relocate':{
+        'dataset_dir': DATA_DIR + '/relocate/hdf5',
+        'num_episodes': 50,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 256,
+        'robot_dim': 30,
+    },
+    'dapg_door':{
+        'dataset_dir': DATA_DIR + '/door/hdf5',
+        'num_episodes': 50,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 28,
+    },
+    'dapg_hammer':{
+        'dataset_dir': DATA_DIR + '/hammer/hdf5',
+        'num_episodes': 50,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 256,
+        'robot_dim': 26,
+    },
+    'dapg_pen':{
+        'dataset_dir': DATA_DIR + '/pen/hdf5',
+        'num_episodes': 50,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 256,
+        'robot_dim': 24,
+    },
+}
+
+HARDWARE_TASK_CONFIGS = {
+    'box':{
+        'dataset_dir': DATA_DIR + '/box_processed_with_interpolation/hdf5',
+        'num_episodes': 15,
+        'episode_len': 300, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 13,
+    },
+    'cloth':{
+        'dataset_dir': DATA_DIR + '/cloth_uncovering_processed_with_interpolation/hdf5',
+        'num_episodes': 15,
+        'episode_len': 300, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 13,
+    },
+}
+
 ### Simulation envs fixed constants
 DT = 0.02
 JOINT_NAMES = ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
