@@ -156,6 +156,70 @@ class DexArtDataset(torch.utils.data.Dataset):
 
         return image_data, qpos_data, flow_data, action_data, is_pad
 
+
+class DexArtTestset(torch.utils.data.Dataset):
+    def __init__(self, episode_ids, dataset_dir, camera_names, norm_stats, flow_type = 'flow', use_image_data = False):
+        super(EpisodicDataset).__init__()
+        self.episode_ids = episode_ids
+        self.dataset_dir = dataset_dir
+        self.camera_names = camera_names
+        self.norm_stats = norm_stats
+        self.flow_type = flow_type
+        self.use_image_data = use_image_data
+        self.is_sim = None
+        # self.__getitem__(0) # initialize self.is_sim
+
+    def __len__(self):
+        return len(self.episode_ids)
+
+    def __getitem__(self, index):
+
+        episode_id = self.episode_ids[index]
+        dataset_path = os.path.join(self.dataset_dir, f'episode_{episode_id}.hdf5')
+        with h5py.File(dataset_path, 'r') as root:
+            # get observation at start_ts only
+            proprioception_obs = root['/observations/proprioception'][...]
+            if self.flow_type == 'flow':
+                flow_obs = root['/observations/flow'][...]
+            elif self.flow_type == 'dynamo':
+                flow_obs = root['/observations/dynamo'][...]
+            if self.use_image_data:
+                image_dict = dict()
+                for cam_name in self.camera_names:
+                    image_dict[cam_name] = root[f'/observations/images/{cam_name}'][...]
+            # get all actions after and including start_ts
+            action = root['/actions'][...]
+
+        # new axis for different cameras
+        if self.use_image_data:
+            all_cam_images = []
+            for cam_name in self.camera_names:
+                all_cam_images.append(image_dict[cam_name])
+            all_cam_images = np.stack(all_cam_images, axis=0)
+
+        # construct observations
+        if self.use_image_data:
+            image_data = torch.from_numpy(all_cam_images)
+        qpos_data = torch.from_numpy(proprioception_obs).float()
+        flow_data = torch.from_numpy(flow_obs).float()
+        action_data = torch.from_numpy(action).float()
+
+        # channel last
+        if self.use_image_data:
+            image_data = torch.einsum('k h w c -> k c h w', image_data)
+
+        # normalize image and change dtype to float
+        if self.use_image_data:
+            image_data = image_data / 255.0
+        else:
+            image_data = torch.tensor([])
+        action_data = (action_data - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
+        qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
+        flow_data = (flow_data - self.norm_stats["flow_mean"]) / self.norm_stats["flow_std"]
+
+        return image_data, qpos_data, flow_data, action_data
+
+
 def get_norm_stats(dataset_dir, num_episodes):
     all_qpos_data = []
     all_action_data = []
@@ -266,6 +330,21 @@ def load_dexart_data(dataset_dir, num_episodes, camera_names, batch_size_train, 
     # val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
 
     return train_dataloader, norm_stats
+
+
+def load_dexart_test_data(dataset_dir, num_episodes, camera_names, norm_stats, flow_type = 'flow'):
+    print(f'\nData from: {dataset_dir}\n')
+    # obtain train test split
+    train_ratio = 0.8
+    shuffled_indices = np.random.permutation(num_episodes)
+
+    # construct dataset and dataloader
+    train_dataset = DexArtTestset(shuffled_indices, dataset_dir, camera_names, norm_stats, flow_type=flow_type)
+    # val_dataset = DexArtDataset(val_indices, dataset_dir, camera_names, norm_stats)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, pin_memory=True, num_workers=1, prefetch_factor=1)
+    # val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
+
+    return train_dataloader
 
 ### env utils
 

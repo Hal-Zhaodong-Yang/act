@@ -52,7 +52,7 @@ class ACTFlow(nn.Module):
         print(f'KL Weight {self.kl_weight}')
         print(f"created {self.object_obs} based model")
 
-    def __call__(self, qpos, image, flow, actions=None, is_pad=None):
+    def __call__(self, qpos, image = None, flow = None, actions=None, is_pad=None):
         env_state = None
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])

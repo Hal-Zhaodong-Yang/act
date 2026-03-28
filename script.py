@@ -61,14 +61,53 @@ Check dynamo pickle file
 """
 Check hardware dataset
 """
-import pickle
-with open("./data/box_processed_with_interpolation/images/only_cur_features/2.pkl", 'rb') as file:
-    flow = pickle.load(file)
+# import pickle
+# with open("./data/box_processed_with_interpolation/images/only_cur_features/2.pkl", 'rb') as file:
+#     flow = pickle.load(file)
 
-flow = np.array(flow)
-print(flow.shape)
-flow = np.squeeze(flow)
-print(flow.shape)
-flow = np.vstack((np.repeat(flow[0:1, :], repeats=10, axis=0), flow))
-print(flow.shape)
-print(flow[:20, :])
+# flow = np.array(flow)
+# print(flow.shape)
+# flow = np.squeeze(flow)
+# print(flow.shape)
+# flow = np.vstack((np.repeat(flow[0:1, :], repeats=10, axis=0), flow))
+# print(flow.shape)
+# print(flow[:20, :])
+
+# """
+# Check dp3 dataset
+# """
+# import torch
+# with open("./data/dp3/train/drill/images/dynamo_init_cur_features/traj_0.pkl", 'rb') as file:
+#     flow = torch.load(file, map_location="cpu")
+
+# flow = np.array(flow.detach().cpu().numpy())
+# print(flow.shape)
+# flow = np.squeeze(flow)
+# print(flow.shape)
+# flow = np.vstack((np.repeat(flow[0:1, :], repeats=10, axis=0), flow))
+# print(flow.shape)
+# print(flow[:20, :])
+
+"""
+Check dp3 dataset
+"""
+data_dir="./data/cyberdemo/train/pick_place_tomato_soup_can/actions/traj_0/action.npy"
+
+data = np.load(data_dir)
+
+print(data.shape)
+
+"""
+Check dp3 dataset flow
+"""
+# import pickle
+# with open("./data/dp3/train/drill/images/init_cur_features/traj_0.pkl", 'rb') as file:
+#     flow = pickle.load(file)
+
+# flow = np.array(flow)
+# print(flow.shape)
+# flow = np.squeeze(flow)
+# print(flow.shape)
+# flow = np.vstack((np.repeat(flow[0:1, :], repeats=10, axis=0), flow))
+# print(flow.shape)
+# print(flow[:20, :])

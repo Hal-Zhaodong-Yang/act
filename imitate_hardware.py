@@ -11,7 +11,7 @@ import h5py
 
 from constants import DT
 from constants import PUPPET_GRIPPER_JOINT_OPEN
-from utils import load_dexart_data # data functions
+from utils import load_dexart_data, load_dexart_test_data # data functions
 from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict # helper functions
 from policy import ACTFlow, ACTPolicy, CNNMLPPolicy
@@ -45,6 +45,7 @@ def main(args):
     camera_names = task_config['camera_names']
     flow_dim = task_config['flow_dim']
     robot_dim = task_config['robot_dim']
+    num_queries = args['chunk_size']
     flow_type = args['object_obs']
 
     # fixed parameters
@@ -55,7 +56,7 @@ def main(args):
         enc_layers = 4
         dec_layers = 7
         nheads = 8
-        state_dim = 28 # TODO: the dimension of the robot, can change this to arguments later
+        state_dim = 22 # TODO: the dimension of the robot, can change this to arguments later
         policy_config = {'lr': args['lr'],
                          'num_queries': args['chunk_size'],
                          'kl_weight': args['kl_weight'],
@@ -95,7 +96,61 @@ def main(args):
     }
 
     if is_eval:
-        ckpt_names = [f'policy_best.ckpt']
+
+        ckpt_name = f'policy_best.ckpt'
+        testset_dir = task_config['testset_dir']
+        test_num_episodes = task_config['test_episodes']
+        ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+        policy = make_policy(policy_class, policy_config)
+        loading_status = policy.load_state_dict(torch.load(ckpt_path))
+        print(loading_status)
+        policy.cuda()
+        policy.eval()
+        print(f'Loaded: {ckpt_path}')
+        stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+        with open(stats_path, 'rb') as f:
+            stats = pickle.load(f)
+
+        flow_pre_process = lambda s_flow: (s_flow - stats['flow_mean']) / stats['flow_std']
+        pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
+        post_process = lambda a: a * stats['action_std'] + stats['action_mean']
+
+        val_dataloader = load_dexart_test_data(testset_dir, test_num_episodes, camera_names, stats, flow_type=flow_type)
+        with torch.inference_mode():
+            policy.eval()
+            test_set_results = []
+            for batch_idx, data in enumerate(val_dataloader):
+                # The data is of shape [1, episode_len, state_dim]
+                image_data, qpos_data, flow_data, action_data = data
+                image_data = image_data.cuda()
+                qpos_data = qpos_data.cuda()
+                flow_data = flow_data.cuda()
+                action_data = action_data.cuda()
+                predicted_action_chunk_list = []
+                for t in range(0, qpos_data.shape[1], num_queries):
+                    qpos = qpos_data[:, t, :]
+                    curr_flow = flow_data[:, t, :]
+                    predicted_action_chunk = torch.squeeze(policy(qpos = qpos, flow = curr_flow))
+                    # Deal with the case when the remaining timesteps are less than num_queries
+                    if t + num_queries > qpos_data.shape[1]:
+                        predicted_action_chunk = predicted_action_chunk[:qpos_data.shape[1] - t]
+                    predicted_action_chunk_list.append(predicted_action_chunk)
+                predicted_actions = torch.cat(predicted_action_chunk_list, dim=0)
+                gt_actions = action_data.squeeze(0)
+                # Post-process predicted actions and gt actions
+                predicted_actions = post_process(predicted_actions.cpu().numpy())
+                gt_actions = post_process(gt_actions.cpu().numpy())
+                # Compute MSE ERROR between predicted_actions and gt_actions without using pre-implemented functions
+                mse_error = np.mean((predicted_actions - gt_actions) ** 2)
+                test_set_results.append(mse_error)
+                print(f"Episode {batch_idx}: MSE error = {mse_error:.6f}")
+            # Compute mean and std of the mse_error across the test set
+            mean_mse_error = np.mean(test_set_results)
+            std_mse_error = np.std(test_set_results)
+            print(f'Test set MSE error: {mean_mse_error:.6f} ± {std_mse_error:.6f}')
+
+            exit()
+
         results = []
         for ckpt_name in ckpt_names:
             success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True)

@@ -111,6 +111,66 @@ HARDWARE_TASK_CONFIGS = {
         'flow_dim': 128,
         'robot_dim': 13,
     },
+    'drill':{
+        'dataset_dir': DATA_DIR + '/dp3/train/drill/hdf5',
+        'testset_dir': DATA_DIR + '/dp3/test/drill/hdf5',
+        'num_episodes': 30,
+        'test_episodes': 10,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 256,
+        'robot_dim': 22,
+    },
+    'dumpling':{
+        'dataset_dir': DATA_DIR + '/dp3/train/dumpling/hdf5',
+        'testset_dir': DATA_DIR + '/dp3/test/dumpling/hdf5',
+        'num_episodes': 30,
+        'test_episodes': 10,
+        'episode_len': 150, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 22,
+    },
+    'roll':{
+        'dataset_dir': DATA_DIR + '/dp3/train/roll/hdf5',
+        'testset_dir': DATA_DIR + '/dp3/test/roll/hdf5',
+        'num_episodes': 30,
+        'test_episodes': 10,
+        'episode_len': 100, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 22,
+    },
+    'dclaw':{
+        'dataset_dir': DATA_DIR + '/cyberdemo/train/dclaw/hdf5',
+        'testset_dir': DATA_DIR + '/cyberdemo/test/dclaw/hdf5',
+        'num_episodes': 12,
+        'test_episodes': 3,
+        'episode_len': 150, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 22,
+    },
+    'pick_place_tomato_soup_can':{
+        'dataset_dir': DATA_DIR + '/cyberdemo/train/pick_place_tomato_soup_can/hdf5',
+        'testset_dir': DATA_DIR + '/cyberdemo/test/pick_place_tomato_soup_can/hdf5',
+        'num_episodes': 12,
+        'test_episodes': 3,
+        'episode_len': 150, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 22,
+    },
+    'pouring':{
+        'dataset_dir': DATA_DIR + '/cyberdemo/train/pouring/hdf5',
+        'testset_dir': DATA_DIR + '/cyberdemo/test/pouring/hdf5',
+        'num_episodes': 12,
+        'test_episodes': 3,
+        'episode_len': 200, # Max possible episode length
+        'camera_names': ['front'],
+        'flow_dim': 128,
+        'robot_dim': 22,
+    },
 }
 
 ### Simulation envs fixed constants

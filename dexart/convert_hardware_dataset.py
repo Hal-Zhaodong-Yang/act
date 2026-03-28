@@ -6,22 +6,22 @@ from PIL import Image
 import pickle
 
 # cloth_uncovering_processed_with_interpolation, box_processed_with_interpolation
-data_root = "./data/cloth_uncovering_processed_with_interpolation"
+data_root = "./data/dp3/train/roll"
 trajectory_list = os.listdir(data_root + "/actions")
 trajectory_num = len(trajectory_list)
 
 for i in range(trajectory_num):
-    data_idx = i + 13 # NOTE different for two datasets (2 and 13)
-    obs_data = np.load(data_root + f"/observations/{data_idx}/observation.npy")
-    action_data = np.load(data_root + f"/actions/{data_idx}/action.npy")
-    with open(data_root + f"/images/only_cur_features/{data_idx}.pkl", 'rb') as file:
+    # data_idx = i + 13 # NOTE different for two datasets (2 and 13)
+    obs_data = np.load(data_root + f"/observations/traj_{i}/observation.npy")
+    action_data = np.load(data_root + f"/actions/traj_{i}/action.npy")
+    with open(data_root + f"/images/only_cur_features/traj_{i}.pkl", 'rb') as file:
         flow = pickle.load(file)
     flow_data = np.squeeze(np.array(flow))
-    flow_data = np.vstack((np.repeat(flow_data[0:1, :], repeats=10, axis=0), flow_data))
+    # flow_data = np.vstack((np.repeat(flow_data[0:1, :], repeats=10, axis=0), flow_data))
 
-    # dynamo_file_name = data_root + f"/images/dynamo_only_cur_features_128/traj_{i}.pkl"
-    # dynamo_data = torch.load(dynamo_file_name, map_location="cpu")
-    # dynamo_flow = dynamo_data.detach().cpu().numpy()
+    dynamo_file_name = data_root + f"/images/dynamo_only_cur_features/traj_{i}.pkl"
+    dynamo_data = torch.load(dynamo_file_name, map_location="cpu")
+    dynamo_flow = dynamo_data.detach().cpu().numpy()
     new_dataset_path = data_root + "/hdf5"
     new_file_path = new_dataset_path + f"/episode_{i}"
 
@@ -41,14 +41,14 @@ for i in range(trajectory_num):
         # image = obs.create_group('images')
         # front_img = image.create_dataset('front', (max_timesteps, 480, 640, 3), dtype='uint8',
         #                         chunks=(1, 480, 640, 3), )
-        proprioception = obs.create_dataset('proprioception', (max_timesteps, 13))
+        proprioception = obs.create_dataset('proprioception', (max_timesteps, 22))
         flow = obs.create_dataset('flow', (max_timesteps, 128))
-        # dynamo = obs.create_dataset('dynamo', (max_timesteps, 128))
-        action = root.create_dataset('actions', (max_timesteps, 13))
+        dynamo = obs.create_dataset('dynamo', (max_timesteps, 128))
+        action = root.create_dataset('actions', (max_timesteps, 22))
 
         root['observations/proprioception'][...] = obs_data[0:max_timesteps, :]
         root['observations/flow'][...] = flow_data[0:max_timesteps, :]
-        # root['observations/dynamo'][...] = dynamo_flow[0:max_timesteps, :]
+        root['observations/dynamo'][...] = dynamo_flow[0:max_timesteps, :]
         # action dataset contains initial observation as the first timestep, which is used for Koopman training
         root['actions'][...] = action_data[1:max_timesteps+1, :]
         # root['observations/images/front'][...] = img_sequence

@@ -20,3 +20,7 @@ python imitate_dexart.py --ckpt_dir ./model/dexart_toilet --policy_class ACT --k
 python imitate_dapg.py --ckpt_dir ./model/dapg_relocate --policy_class ACT --kl_weight 10 --chunk_size 10 --hidden_dim 512 --batch_size 8 --dim_feedforward 3200 --num_epochs 2000  --lr 1e-5 --task_name dapg_relocate --seed 0 --object_obs flow
 ```
 
+```
+python imitate_hardware.py --ckpt_dir ./model/drill --policy_class ACT --kl_weight 10 --chunk_size 20 --hidden_dim 512 --batch_size 8 --dim_feedforward 3200 --num_epochs 5000  --lr 1e-5 --task_name drill --seed 0 --object_obs dynamo
+```
+
