@@ -151,16 +151,6 @@ def main(args):
 
             exit()
 
-        results = []
-        for ckpt_name in ckpt_names:
-            success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True)
-            results.append([ckpt_name, success_rate, avg_return])
-
-        for ckpt_name, success_rate, avg_return in results:
-            print(f'{ckpt_name}: {success_rate=} {avg_return=}')
-        print()
-        exit()
-
     train_dataloader, stats = load_dexart_data(dataset_dir, num_episodes, camera_names, batch_size_train, flow_type=flow_type)
 
     # save dataset stats
